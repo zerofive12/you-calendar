@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ปฏิทินกิจกรรม + โน้ต</title>
+  <meta name="theme-color" content="#3b82f6" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="กิจกรรม" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icon.png" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background: linear-gradient(to right, #ffffff, #ffe4e6, #bfdbfe);
+      background-size: 400% 400%;
+      animation: gradientLoop 15s ease infinite;
+    }
+    @keyframes gradientLoop {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+  </style>
+</head>
+<body class="animate-gradient-loop min-h-screen p-4 pb-24">
+
+  <div class="max-w-xl mx-auto bg-white bg-opacity-80 backdrop-blur-md rounded-2xl shadow-2xl p-5 sm:p-6">
+    <h1 class="text-xl sm:text-2xl font-bold text-blue-600 text-center mb-5">📅 ปฏิทินกิจกรรม & 📝 โน้ต</h1>
+
+    <form id="taskForm" class="space-y-4">
+      <input type="date" id="date" class="w-full p-3 text-base border rounded-lg" required />
+      <input type="time" id="time" class="w-full p-3 text-base border rounded-lg" required />
+      <input type="text" id="title" placeholder="หัวข้อกิจกรรม" class="w-full p-3 text-base border rounded-lg" required />
+      <textarea id="note" placeholder="โน้ตเพิ่มเติม..." class="w-full p-3 text-base border rounded-lg" rows="3"></textarea>
+      <button class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-lg text-lg" type="submit">➕ เพิ่มกิจกรรม</button>
+    </form>
+
+    <hr class="my-6" />
+
+    <button id="showAllBtn" class="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 rounded-lg mb-4">📜 ดูกิจกรรมทั้งหมด</button>
+
+    <div>
+      <label for="viewDate" class="block font-semibold mb-2">📆 เลือกวันที่ต้องการดู</label>
+      <input type="date" id="viewDate" class="w-full p-3 text-base border rounded-lg mb-4" />
+      <ul id="taskList" class="space-y-4"></ul>
+    </div>
+  </div>
+
+  <script>
+    function isLocalStorageAvailable() {
+      try {
+        const testKey = '__test__';
+        localStorage.setItem(testKey, testKey);
+        localStorage.removeItem(testKey);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    if (!isLocalStorageAvailable()) {
+      alert("Safari ไม่สามารถบันทึกข้อมูลได้ในโหมดนี้ (เช่น Private Mode) กรุณาใช้โหมดปกติ");
+    }
+
+    const form = document.getElementById('taskForm');
+    const taskList = document.getElementById('taskList');
+    const viewDate = document.getElementById('viewDate');
+    let tasks = JSON.parse(localStorage.getItem('calendarTasks')) || [];
+
+    function saveTasks() {
+      localStorage.setItem('calendarTasks', JSON.stringify(tasks));
+    }
+
+    function renderTasks(date) {
+      taskList.innerHTML = '';
+      const filtered = tasks.filter(t => t.date === date);
+      if (filtered.length === 0) {
+        taskList.innerHTML = '<p class="text-gray-500 text-center">ไม่มีรายการสำหรับวันนี้</p>';
+        return;
+      }
+      filtered.sort((a, b) => a.time.localeCompare(b.time));
+      filtered.forEach((task) => {
+        const li = document.createElement('li');
+        li.className = "bg-blue-100 p-4 rounded-xl shadow-md";
+        li.innerHTML = `
+          <div class="flex justify-between items-start">
+            <div class="flex-1">
+              <p class="font-semibold text-lg text-blue-700">🕒 ${task.time} - ${task.title}</p>
+              <p class="text-sm text-gray-700 mt-1 whitespace-pre-wrap">${task.note}</p>
+            </div>
+            <button class="text-red-500 hover:text-red-700 font-bold text-xl ml-2" onclick="deleteTask('${task.date}', '${task.time}', '${task.title}')">✖</button>
+          </div>
+        `;
+        taskList.appendChild(li);
+      });
+    }
+
+    function renderAllTasks() {
+      taskList.innerHTML = '';
+      if (tasks.length === 0) {
+        taskList.innerHTML = '<p class="text-gray-500 text-center">ไม่มีรายการกิจกรรม</p>';
+        return;
+      }
+
+      const sortedTasks = [...tasks].sort((a, b) => {
+        if (a.date === b.date) return a.time.localeCompare(b.time);
+        return a.date.localeCompare(b.date);
+      });
+
+      sortedTasks.forEach((task) => {
+        const li = document.createElement('li');
+        li.className = "bg-yellow-100 p-4 rounded-xl shadow-md";
+        li.innerHTML = `
+          <div class="flex justify-between items-start">
+            <div class="flex-1">
+              <p class="font-semibold text-blue-700 text-lg">📅 ${task.date} ⏰ ${task.time} - ${task.title}</p>
+              <p class="text-sm text-gray-700 mt-1 whitespace-pre-wrap">${task.note}</p>
+            </div>
+            <button class="text-red-500 hover:text-red-700 font-bold text-xl ml-2" onclick="deleteTask('${task.date}', '${task.time}', '${task.title}')">✖</button>
+          </div>
+        `;
+        taskList.appendChild(li);
+      });
+    }
+
+    function deleteTask(date, time, title) {
+      tasks = tasks.filter(t => !(t.date === date && t.time === time && t.title === title));
+      saveTasks();
+      if (viewDate.value === date) {
+        renderTasks(viewDate.value);
+      } else {
+        renderAllTasks();
+      }
+    }
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const newTask = {
+        date: document.getElementById('date').value,
+        time: document.getElementById('time').value,
+        title: document.getElementById('title').value,
+        note: document.getElementById('note').value
+      };
+      tasks.push(newTask);
+      saveTasks();
+
+      // ตั้งค่าค่าวันที่ที่ดู ให้ตรงกับวันที่กิจกรรมใหม่
+      viewDate.value = newTask.date;
+
+      // แสดงกิจกรรมทันที
+      renderTasks(viewDate.value);
+      form.reset();
+    });
+
+    viewDate.addEventListener('change', () => {
+      renderTasks(viewDate.value);
+    });
+
+    document.getElementById('showAllBtn').addEventListener('click', () => {
+      renderAllTasks();
+    });
+
+    const today = new Date().toISOString().split("T")[0];
+    document.getElementById('date').value = today;
+    viewDate.value = today;
+    renderTasks(today);
+
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("service-worker.js").catch(console.error);
+    }
+  </script>
+</body>
+</html>
